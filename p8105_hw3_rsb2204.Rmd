@@ -1,0 +1,96 @@
+---
+title: "Homework 3"
+author: "Riya Bhilegaonkar"
+date: "2022-10-11"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load Libraries and Set Chunk Options:
+```{r}
+library(tidyverse)
+library(p8105.datasets)
+library(patchwork)
+
+knitr::opts_chunk$set(
+	echo = TRUE,
+	warning = FALSE,
+	fig.width = 8, 
+  fig.height = 6,
+  out.width = "90%"
+)
+
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis"
+)
+
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
+
+```
+
+## Problem 1
+```{r}
+data("instacart")
+View("instacart")
+
+
+```
+
+The dataset contains 1,384,617 observations of 131,209 unique users, where each row in the dataset is a product from an order.
+
+## Problem 2
+Loading and tidying the data
+```{r}
+accel_data = read_csv("data/accel_data.csv")%>% janitor::clean_names() %>%
+mutate(day_type = ifelse(day == "Saturday" | day == "Sunday", "weekend", "weekday")) %>% 
+drop_na() %>%
+pivot_longer(activity_1:activity_1440, names_to = "activity", values_to="min_time")
+
+View(accel_data)
+```
+
+The `accel_data` dataset has data from an accelerometer of a 63 year old male with a BMI of 25 who was diagnosed with congestive heart failure.
+The resulting dataset has the 5 variables of week, day_id, day, day_type (weekday vs weekend), activity, min_time (activity count for each minute of a 24-hour day starting at midnight). There are 50400 observations and 5 variables. The dataset provides specific information on the accelerometer activity count for each minute for a particular, week, day and specific day_id, indicating distinctive days. 
+
+Aggregate across minutes to create a total activity variable for each day, and create a table showing these totals. Are any trends apparent?
+```{r}
+accel_data %>% 
+pivot_wider(names_from="activity",values_from ="min_time") %>%
+group_by(week, day_id, day) %>% summarise(tot_activity = rowSums(across(activity_1:activity_1440,na.rm=TRUE))) %>%
+knitr::kable(digits = 2)
+```
+
+From the table there does not appear to be any obvious trends. 
+
+Making a single-panel plot that shows the 24-hour activity time course for each day
+```{r}
+accel_data %>%
+pivot_wider(names_from="activity",values_from ="min_time") %>%
+group_by(week, day_id, day) %>% summarise(tot_activity = rowSums(across(activity_1:activity_1440,na.rm=TRUE))) %>%
+ggplot(aes(x=day, y=tot_activity,group=week, color=week)) +
+geom_line() +
+ylab("Total Activity")+
+xlab("Day of the Week")
+  
+```
+
+
+## Problem 3
+Loading the data
+```{r}
+data("ny_noaa")
+
+ny_noaa =
+  ny_noaa %>%
+  as_tibble(ny_noaa) %>%
+  janitor::clean_names() %>%
+  separate(date, c("year", "month", "day"))%>%
+  mutate(tmax = as.integer(tmax), tmin = as.integer(tmin))
+```
