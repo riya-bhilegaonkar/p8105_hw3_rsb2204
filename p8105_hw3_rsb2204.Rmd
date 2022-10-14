@@ -36,14 +36,66 @@ scale_fill_discrete = scale_fill_viridis_d
 ```
 
 ## Problem 1
+
+The dataset contains 1,384,617 observations of 131,209 unique users, where each row in the dataset is a product from an order.
+
 ```{r}
 data("instacart")
-View("instacart")
 
+instacart = 
+  instacart %>% 
+  as_tibble(instacart)
+```
+
+#### Answer questions about the data
+
+This dataset contains `r nrow(instacart)` rows and `r ncol(instacart)` columns, with each row resprenting a single product from an instacart order. Variables include identifiers for user, order, and product; the order in which each product was added to the cart. There are several order-level variables, describing the day and time of the order, and number of days since prior order. Then there are several item-specific variables, describing the product name (e.g. Yogurt, Avocado), department (e.g. dairy and eggs, produce), and aisle (e.g. yogurt, fresh fruits), and whether the item has been ordered by this user in the past. In total, there are `r instacart %>% select(product_id) %>% distinct %>% count` products found in `r instacart %>% select(user_id, order_id) %>% distinct %>% count` orders from `r instacart %>% select(user_id) %>% distinct %>% count` distinct users.
+
+Below is a table summarizing the number of items ordered from aisle. In total, there are 134 aisles, with fresh vegetables and fresh fruits holding the most items ordered by far.
+
+```{r}
+instacart %>% 
+  count(aisle) %>% 
+  arrange(desc(n))
+```
+
+This plot shows the number of items ordered in each aisle. Here, aisles are ordered by ascending number of items.
+
+```{r}
+instacart %>% 
+  count(aisle) %>% 
+  filter(n > 10000) %>% 
+  mutate(aisle = fct_reorder(aisle, n)) %>% 
+  ggplot(aes(x = aisle, y = n)) + 
+  geom_point() + 
+  labs(title = "Number of items ordered in each aisle") +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
 
 ```
 
-The dataset contains 1,384,617 observations of 131,209 unique users, where each row in the dataset is a product from an order.
+The table shows the three most popular items in aisles `baking ingredients`, `dog food care`, and `packaged vegetables fruits`, and includes the number of times each item is ordered in your table.
+
+```{r}
+instacart %>% 
+  filter(aisle %in% c("baking ingredients", "dog food care", "packaged vegetables fruits")) %>%
+  group_by(aisle) %>% 
+  count(product_name) %>% 
+  mutate(rank = min_rank(desc(n))) %>% 
+  filter(rank < 4) %>% 
+  arrange(desc(n)) %>%
+  knitr::kable()
+```
+
+The table showing the mean hour of the day at which Pink Lady Apples and Coffee Ice Cream are ordered on each day of the week. 
+
+```{r}
+instacart %>%
+  filter(product_name %in% c("Pink Lady Apples", "Coffee Ice Cream")) %>%
+  group_by(product_name, order_dow) %>%
+  summarize(mean_hour = mean(order_hour_of_day)) %>%
+  spread(key = order_dow, value = mean_hour) %>%
+  knitr::kable(digits = 2)
+```
 
 ## Problem 2
 Loading and tidying the data
@@ -53,7 +105,6 @@ mutate(day_type = ifelse(day == "Saturday" | day == "Sunday", "weekend", "weekda
 drop_na() %>%
 pivot_longer(activity_1:activity_1440, names_to = "activity", values_to="min_time")
 
-View(accel_data)
 ```
 
 The `accel_data` dataset has data from an accelerometer of a 63 year old male with a BMI of 25 who was diagnosed with congestive heart failure.
@@ -67,23 +118,26 @@ group_by(week, day_id, day) %>% summarise(tot_activity = rowSums(across(activity
 knitr::kable(digits = 2)
 ```
 
-From the table there does not appear to be any obvious trends. 
+From the table there does not appear to be any obvious trends. However, there do appear to be 2 Saturdays, one during the 4th week and one during the 5th week where the total activity minutes are low in relation to the other days of the week.
 
 Making a single-panel plot that shows the 24-hour activity time course for each day
 ```{r}
 accel_data %>%
 pivot_wider(names_from="activity",values_from ="min_time") %>%
 group_by(week, day_id, day) %>% summarise(tot_activity = rowSums(across(activity_1:activity_1440,na.rm=TRUE))) %>%
-ggplot(aes(x=day, y=tot_activity,group=week, color=week)) +
+ggplot(aes(x=factor(day,levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")), y=tot_activity,group=week, color=week)) +
 geom_line() +
 ylab("Total Activity")+
 xlab("Day of the Week")
   
 ```
 
+From the plot we see that there is fluctuation in the total activity minute counts as the days progress each week, we do see a dip in activity time during week 4 and 5 on Saturday. Actvity counts tend to rise from Tuesday to Saturday. There does appear to be variance in the fluctuations per week and hence we can't conclude any obvious patterns.
 
 ## Problem 3
-Loading the data
+The NY NOAA dataset contains records of precipation, snowfall, maximum temperature, minimum temperature and snow depth for different stations. There is the issue of missing data as only half the stations report precipitation only and the period of records vary my station. This is an extensive issue as some stations may only present data for a year versus some may report data for over 175 years. The dataset has 2595176 observations and 7 variables, key variables are `id` which is Weather station ID and `date`, these group together the weather mertic data that the other 5 variables represent.
+
+Loading the data and cleaning up the data.
 ```{r}
 data("ny_noaa")
 
@@ -92,5 +146,63 @@ ny_noaa =
   as_tibble(ny_noaa) %>%
   janitor::clean_names() %>%
   separate(date, c("year", "month", "day"))%>%
-  mutate(tmax = as.integer(tmax), tmin = as.integer(tmin))
+  mutate(tmax = as.integer(tmax), tmin = as.integer(tmin), snow = as.integer(snow)) %>%
+  mutate(real_tmax= tmax/10, real_tmin=tmin/10, real_prcp = prcp/10, real_snow = snow/25.4, "month" = as.integer(month), "month" = month.abb[month])
 ```
+
+To ensure observations for temperature, precipitation and snowfall are given in reasonable units we perform some transformations. In the case of precipitation values, we find the real values by ten to convert to mm and celcius. Snowfall is typically discussed in inches, hence we divide snow by 25.4 to obtain column `real_snow` that represents snowfall in inches. `real_tmax` and `real_tmin` represent temperature in celcius and `real_prcp` has precipitation in mm.
+
+```{r}
+ny_noaa %>% 
+count(snow) %>%
+mutate(rank=min_rank(desc(n)))%>%
+filter(rank < 4)%>%
+arrange(desc(n))%>%
+knitr::kable()
+```
+
+The most commonly observed value is 0, this as snowfall is measured in terms of mm and it is only common to see snow in the winter months of New York which typically range from December to March. As this is only 4 months of the year, the majority of days would have 0 mm of snowfall. Other common values are NA, likely due to a large number of stations only measuring precipitation. The 3rd most common value is 25 mm of snowfall, observed 31022 times in the dataset.
+
+Two-panel plot showing the average max temperature in January and in July in each station across years.
+
+```{r}
+ny_noaa %>%
+filter(month == "Jan"| month == "Jul") %>% 
+group_by(month, year, id) %>% 
+summarize(mean_tmax = mean(real_tmax, na.rm = TRUE)) %>% 
+ggplot(aes(x = year, y = mean_tmax, group=id)) +
+geom_line(alpha=.2) +
+facet_grid(.~month) + 
+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+ylab("Average Max Temperature")+
+xlab("Year")
+```
+
+For the two panel plot we use the created variable of `real_tmax` which converts the units of temperature from tenths of celcius to celcius for appropriate interpretation. From the two panel plot we see that temperatures in January fluctuate between -10 degrees celcius and 10 degrees celcius, there does appear to some outliers such as a temperature that is below -10 in the year of 1982. There are fluctuations of average temperatures at the various stations, but the avergae temperatures are consistent with what is expected to be a temperature in new york in January. Now considering the July panel, we see that temperatures are typically above 20 degrees celcius, though there are some noticeable outliers such as in the year of 1988, temperatures in July seem to fluctuate at a smaller frequency than the temperatures in January. 
+
+Make a two-panel plot showing (i) `tmax` vs `tmin` for the full dataset and (ii) make a plot showing the distribution of snowfall values greater than 0 and less than 100 separately by year. 
+
+```{r}
+temp_plot = ny_noaa %>%
+ggplot(aes(x=tmin, y=tmax))+
+geom_smooth(se = FALSE)+
+labs(
+    title = "Temperature plot",
+    x = "Minimum temperature (tenths of degrees C)",
+    y = "Maximum temperature (tenths of degrees C)"
+  )
+
+snow_dist = ny_noaa %>%
+  filter((snow > 0 & snow < 100))%>%
+  ggplot(aes(x=year, y=snow))+
+  geom_boxplot()+ 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  labs(
+    title = "Snowfall Distribution",
+    x = "Year",
+    y = "Snowfall (in mm)"
+  )
+
+temp_plot + snow_dist
+```
+
